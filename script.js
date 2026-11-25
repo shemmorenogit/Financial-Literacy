@@ -320,47 +320,40 @@ renderLessonList(); renderLesson();
 
 updateBudget();
 
-// Give each learning module its own shareable page while keeping the existing
-// interactions and progress state available across the whole experience.
+// Dedicated static pages keep each practice topic on its own URL.
 const pageSections = [...document.querySelectorAll('main > .content-section')];
 const pageTargets = new Map(pageSections.map((section) => [section.id, section]));
+const pageFiles = {
+  'plan-section': 'plan.html',
+  'life-happens': 'life-happens.html',
+  'spot-the-trick': 'spot-the-trick.html',
+  'money-at-home': 'money-at-home.html',
+  'confidence-check': 'confidence.html'
+};
+const filePages = new Map(Object.entries(pageFiles).map(([id, file]) => [file, id]));
 const heroSection = document.querySelector('.hero');
-function showPage(pageId, { focus = false } = {}) {
+function showPage(pageId) {
   const target = pageTargets.get(pageId);
   const isHome = !target;
   document.body.dataset.currentPage = isHome ? 'home' : pageId;
   if (heroSection) heroSection.hidden = !isHome;
   pageSections.forEach((section) => { section.hidden = section !== target; });
-  document.querySelectorAll('.desktop-nav a, .hub-nav a, .quick-links a').forEach((link) => {
-    const destination = link.dataset.page || link.hash.slice(1);
-    if (destination && pageTargets.has(destination)) {
-      link.href = `?page=${encodeURIComponent(destination)}`;
-      if (link.closest('.desktop-nav')) {
-        if (destination === pageId) link.setAttribute('aria-current', 'page');
-        else link.removeAttribute('aria-current');
-      }
+  document.querySelectorAll('a[href^="#"]').forEach((link) => {
+    const destination = link.hash.slice(1);
+    if (destination === 'top') {
+      link.href = './index.html';
+      return;
+    }
+    if (!pageTargets.has(destination)) return;
+    link.href = pageFiles[destination]
+      ? `./${pageFiles[destination]}`
+      : `./index.html?page=${encodeURIComponent(destination)}`;
+    if (link.closest('.desktop-nav')) {
+      if (destination === pageId) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
     }
   });
-  if (focus && target) {
-    target.setAttribute('tabindex', '-1');
-    target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
 }
-function routeFromLocation() {
-  showPage(new URLSearchParams(window.location.search).get('page'));
-}
-document.addEventListener('click', (event) => {
-  const link = event.target.closest('a[href^="#"]');
-  if (!link) return;
-  const pageId = link.hash.slice(1);
-  if (!pageTargets.has(pageId)) return;
-  event.preventDefault();
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set('page', pageId);
-  nextUrl.hash = '';
-  window.history.pushState({}, '', nextUrl);
-  showPage(pageId, { focus: true });
-});
-window.addEventListener('popstate', routeFromLocation);
-routeFromLocation();
+const routeFile = window.location.pathname.split('/').pop() || 'index.html';
+const pageId = filePages.get(routeFile) || new URLSearchParams(window.location.search).get('page');
+showPage(pageId);
