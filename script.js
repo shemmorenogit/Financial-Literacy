@@ -156,7 +156,7 @@ updateBudget();
 // New learning hub features are self-contained so the original Money Moves flow stays intact.
 const STORAGE_KEY = 'money-moves-learning-progress-v1';
 const emptyProgress = { lessons: {}, quizScores: {}, activities: [], xp: 0, streak: 0, lastVisit: null, badges: [] };
-let progressState;
+var progressState;
 try { progressState = { ...emptyProgress, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
 catch { progressState = { ...emptyProgress }; }
 function saveProgress() {
@@ -319,3 +319,48 @@ document.addEventListener('keydown', (event) => {
 renderLessonList(); renderLesson();
 
 updateBudget();
+
+// Give each learning module its own shareable page while keeping the existing
+// interactions and progress state available across the whole experience.
+const pageSections = [...document.querySelectorAll('main > .content-section')];
+const pageTargets = new Map(pageSections.map((section) => [section.id, section]));
+const heroSection = document.querySelector('.hero');
+function showPage(pageId, { focus = false } = {}) {
+  const target = pageTargets.get(pageId);
+  const isHome = !target;
+  document.body.dataset.currentPage = isHome ? 'home' : pageId;
+  if (heroSection) heroSection.hidden = !isHome;
+  pageSections.forEach((section) => { section.hidden = section !== target; });
+  document.querySelectorAll('.desktop-nav a, .hub-nav a, .quick-links a').forEach((link) => {
+    const destination = link.dataset.page || link.hash.slice(1);
+    if (destination && pageTargets.has(destination)) {
+      link.href = `?page=${encodeURIComponent(destination)}`;
+      if (link.closest('.desktop-nav')) {
+        if (destination === pageId) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+      }
+    }
+  });
+  if (focus && target) {
+    target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+function routeFromLocation() {
+  showPage(new URLSearchParams(window.location.search).get('page'));
+}
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a[href^="#"]');
+  if (!link) return;
+  const pageId = link.hash.slice(1);
+  if (!pageTargets.has(pageId)) return;
+  event.preventDefault();
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set('page', pageId);
+  nextUrl.hash = '';
+  window.history.pushState({}, '', nextUrl);
+  showPage(pageId, { focus: true });
+});
+window.addEventListener('popstate', routeFromLocation);
+routeFromLocation();
